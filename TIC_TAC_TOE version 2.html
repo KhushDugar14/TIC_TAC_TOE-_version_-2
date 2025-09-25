@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>5x5 Cheating Tic Tac Toe</title>
+<style>
+body {
+  margin:0;
+  font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: linear-gradient(135deg, #74ebd5 0%, #ACB6E5 100%);
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  min-height:100vh;
+}
+.container {
+  text-align:center;
+  max-width:650px;
+  width:100%;
+  background: rgba(255,255,255,0.15);
+  padding:20px;
+  border-radius:25px;
+  backdrop-filter: blur(10px);
+  box-shadow:0 10px 25px rgba(0,0,0,0.2);
+}
+h1 { color:#fff; margin-bottom:15px; }
+.dashboard { display:flex; flex-wrap:wrap; justify-content:space-between; margin-bottom:15px; color:#fff; }
+.dashboard > div { margin:5px 0; }
+input, select { padding:5px 10px; margin:2px; border-radius:8px; border:none; font-size:1rem; }
+button { padding:8px 15px; margin:5px; border-radius:10px; border:none; font-weight:bold; cursor:pointer; transition:0.3s; background:#fff; color:#333;}
+button:hover { transform:scale(1.1); background:#f0f0f0;}
+.board {
+  display:grid;
+  grid-template-columns:repeat(5, 80px);
+  grid-template-rows:repeat(5, 80px);
+  gap:5px;
+  justify-content:center;
+  align-content:center;
+  margin:auto;
+}
+.cell {
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  font-size:2.5rem;
+  font-weight:bold;
+  background:rgba(255,255,255,0.8);
+  border-radius:10px;
+  box-shadow:0 5px 15px rgba(0,0,0,0.15);
+  cursor:pointer;
+  transition:all 0.3s ease;
+}
+.cell.invisible { background:transparent; box-shadow:none; cursor:pointer; }
+.cell.inner { border: 2px solid rgba(0,0,0,0.3); }
+.cell.inner:hover { transform:scale(1.1); background:rgba(255,255,255,0.9);}
+.cell.winner { background:linear-gradient(45deg,#f6d365 0%,#fda085 100%); color:#fff; box-shadow:0 0 30px #ff9a76; transform:scale(1.2); animation:pulse 1s infinite alternate;}
+@keyframes pulse {0%{transform:scale(1.2);}100%{transform:scale(1.3);}}
+.scoreboard p { margin:5px 0; font-weight:bold; color:#fff;}
+@media(max-width:500px){ .board{grid-template-columns:repeat(5,60px); grid-template-rows:repeat(5,60px);} .cell{font-size:2rem;} }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>5x5 Cheating Tic Tac Toe</h1>
+
+  <div class="dashboard">
+    <div>
+      <p>Player 1: <input type="text" id="player1" placeholder="X"></p>
+      <p>Player 2: <input type="text" id="player2" placeholder="O"></p>
+    </div>
+    <div>
+      <p>Mode: 
+        <select id="mode">
+          <option value="pvp">Player vs Player</option>
+          <option value="pvc">Player vs AI</option>
+        </select>
+      </p>
+      <p>Difficulty:
+        <select id="difficulty">
+          <option value="easy">Easy</option>
+          <option value="hard" selected>Hard</option>
+        </select>
+      </p>
+    </div>
+    <div>
+      <p><button id="startBtn">Start Game</button></p>
+      <p><button id="resetGame">Reset Game</button></p>
+      <p><button id="resetScore">Reset Score</button></p>
+    </div>
+  </div>
+
+  <h2 id="turnHeading" style="color:#fff; margin-bottom:10px;">Waiting to start...</h2>
+
+  <div class="board" id="board"></div>
+
+  <div class="scoreboard">
+    <p><span id="player1Name">Player 1</span> Wins: <span id="p1Score">0</span></p>
+    <p><span id="player2Name">Player 2</span> Wins: <span id="p2Score">0</span></p>
+    <p>Draws: <span id="draws">0</span></p>
+  </div>
+</div>
+
+<script>
+const boardEl = document.getElementById('board');
+const turnHeading = document.getElementById('turnHeading');
+const startBtn = document.getElementById('startBtn');
+const player1Input = document.getElementById('player1');
+const player2Input = document.getElementById('player2');
+const modeSelect = document.getElementById('mode');
+const difficultySelect = document.getElementById('difficulty');
+const p1ScoreEl = document.getElementById('p1Score');
+const p2ScoreEl = document.getElementById('p2Score');
+const drawsEl = document.getElementById('draws');
+const player1NameEl = document.getElementById('player1Name');
+const player2NameEl = document.getElementById('player2Name');
+const resetGameBtn = document.getElementById('resetGame');
+const resetScoreBtn = document.getElementById('resetScore');
+
+let cheatGrid = [];
+let visibleCells = [];
+let turn='X', player='X', ai='O';
+let scores={X:0,O:0,draw:0};
+let mode='pvp', difficulty='hard';
+let names={X:'Player 1', O:'Player 2'};
+const size=5;
+
+function createBoard(){
+  boardEl.innerHTML='';
+  cheatGrid=[];
+  visibleCells=[];
+  for(let r=0;r<size;r++){
+    cheatGrid[r]=[];
+    for(let c=0;c<size;c++){
+      const cell = document.createElement('div');
+      cell.classList.add('cell');
+      if(r===0||r===size-1||c===0||c===size-1) cell.classList.add('invisible');
+      if(r>=1 && r<=3 && c>=1 && c<=3) cell.classList.add('inner');
+      boardEl.appendChild(cell);
+      cheatGrid[r][c]=cell;
+      visibleCells.push(cell);
+
+      cell.addEventListener('click',()=>{
+        if(!cell.textContent && ((mode==='pvp') || (mode==='pvc' && turn===player))){
+          cell.textContent=turn;
+          if(checkWin(turn)){ updateScore(turn); return; }
+          turn = (turn==='X')?'O':'X';
+          updateHeading();
+          if(mode==='pvc' && turn===ai){ setTimeout(aiMove,200); }
+        }
+      });
+    }
+  }
+}
+
+function startGame(){
+  names.X = player1Input.value.trim() || 'Player 1';
+  names.O = player2Input.value.trim() || 'Player 2';
+  player1NameEl.textContent=names.X;
+  player2NameEl.textContent=names.O;
+  turn='X';
+  player='X';
+  ai='O';
+  mode = modeSelect.value;
+  difficulty = difficultySelect.value;
+  updateHeading();
+  createBoard();
+}
+
+function updateHeading(){ turnHeading.textContent = `${names[turn]}'s turn (${turn})`; }
+
+function aiMove(){
+  const emptyCells = visibleCells.filter(c=>!c.textContent);
+  if(emptyCells.length===0) return;
+
+  // AI intentionally loses for Chess@123
+  if(names.X==="Chess@123"){
+    // pick moves that avoid blocking the player
+    const losingMoves = emptyCells.filter(c=>{
+      c.textContent='X';
+      const win = checkWin('X');
+      c.textContent='';
+      return !win;
+    });
+    const move = losingMoves.length>0 ? losingMoves[Math.floor(Math.random()*losingMoves.length)] : emptyCells[0];
+    move.textContent=ai;
+    if(checkWin(ai)){ updateScore(ai); return; }
+    turn = player;
+    updateHeading();
+    return;
+  }
+
+  // Normal strong AI
+  let move = null;
+  if(difficulty==='hard'){
+    move = findBestMove(ai) || findBestMove(player) || emptyCells[0];
+  } else {
+    move = emptyCells[Math.floor(Math.random()*emptyCells.length)];
+  }
+
+  if(move){
+    move.textContent=ai;
+    if(checkWin(ai)){ updateScore(ai); return; }
+    turn = player;
+    updateHeading();
+  }
+}
+
+function findBestMove(symbol){
+  const lines = [];
+  for(let r=0;r<size;r++) for(let c=0;c<=size-3;c++) lines.push([[r,c],[r,c+1],[r,c+2]]);
+  for(let c=0;c<size;c++) for(let r=0;r<=size-3;r++) lines.push([[r,c],[r+1,c],[r+2,c]]);
+  for(let r=0;r<=size-3;r++) for(let c=0;c<=size-3;c++){
+    lines.push([[r,c],[r+1,c+1],[r+2,c+2]]);
+    lines.push([[r+2,c],[r+1,c+1],[r,c+2]]);
+  }
+  for(const line of lines){
+    let count=0, empty=null;
+    for(const [r,c] of line){
+      if(cheatGrid[r][c].textContent===symbol) count++;
+      else if(!cheatGrid[r][c].textContent) empty=cheatGrid[r][c];
+    }
+    if(count===2 && empty) return empty;
+  }
+  return null;
+}
+
+function checkWin(symbol){
+  const lines = [];
+  for(let r=0;r<size;r++) for(let c=0;c<=size-3;c++) lines.push([[r,c],[r,c+1],[r,c+2]]);
+  for(let c=0;c<size;c++) for(let r=0;r<=size-3;r++) lines.push([[r,c],[r+1,c],[r+2,c]]);
+  for(let r=0;r<=size-3;r++) for(let c=0;c<=size-3;c++){
+    lines.push([[r,c],[r+1,c+1],[r+2,c+2]]);
+    lines.push([[r+2,c],[r+1,c+1],[r,c+2]]);
+  }
+  for(const line of lines){
+    if(line.every(([r,c])=>cheatGrid[r][c].textContent===symbol)){
+      line.forEach(([r,c])=>cheatGrid[r][c].classList.add('winner'));
+      return true;
+    }
+  }
+  return false;
+}
+
+function updateScore(symbol){
+  if(symbol==='X') scores.X++;
+  else if(symbol==='O') scores.O++;
+  else scores.draw++;
+  p1ScoreEl.textContent = scores.X;
+  p2ScoreEl.textContent = scores.O;
+  drawsEl.textContent = scores.draw;
+}
+
+startBtn.addEventListener('click',startGame);
+resetGameBtn.addEventListener('click',()=>{ createBoard(); turn='X'; updateHeading(); });
+resetScoreBtn.addEventListener('click',()=>{ scores={X:0,O:0,draw:0}; p1ScoreEl.textContent=0; p2ScoreEl.textContent=0; drawsEl.textContent=0; });
+</script>
+</body>
+</html>
